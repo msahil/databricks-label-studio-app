@@ -120,7 +120,3 @@ Lakebase uses Postgres 15-style defaults: new roles may not **CREATE** objects i
 ## Lakebase auth (Autoscaling)
 
 Connection uses an **OAuth token as the Postgres password** ([connection strings](https://docs.databricks.com/aws/en/oltp/projects/connection-strings)). The app’s `start.py` calls `POST /api/2.0/postgres/credentials` when `PGPASSWORD` is not set. Tokens are short-lived; if the app fails after a long idle period, **restart the app** from Compute → Apps.
-
-## Lakebase Provisioned (alternative)
-
-If you use **Lakebase Provisioned** instead of Autoscaling, replace the `postgres` block in `resources/label_studio.app.yml` with a `database` block (`instance_name`, `database_name`, `permission: CAN_CONNECT_AND_CREATE`) as described in the file comments.
