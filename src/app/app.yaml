@@ -1,0 +1,13 @@
+# Databricks Apps: Lakebase injects PG* vars; for Autoscaling, password is an OAuth token.
+# valueFrom: database resolves to the Postgres endpoint resource path (see environment-variables doc).
+command:
+  - "python"
+  - "start.py"
+
+env:
+  - name: DJANGO_DB
+    value: "default"
+  - name: LAKEBASE_POSTGRES_ENDPOINT
+    valueFrom: database
+  # CSRF_TRUSTED_ORIGINS and LABEL_STUDIO_HOST are set in start.py (AWS Apps public URL).
+  # Override here for non-AWS or custom domains (no trailing slash on LABEL_STUDIO_HOST).

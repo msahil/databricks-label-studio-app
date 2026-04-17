@@ -1,0 +1,28 @@
+# Label Studio as a Databricks App with Lakebase (PostgreSQL).
+# App source: src/app (app.yaml, requirements.txt, start.py).
+#
+# Lakebase Autoscaling: uses the postgres app resource (branch + database).
+# If you use Lakebase Provisioned instead, replace the `resources` entry with:
+#   - name: database
+#     database:
+#       instance_name: "<your-instance-name>"
+#       database_name: "<postgres-db-name>"
+#       permission: CAN_CONNECT_AND_CREATE
+#
+# start.py maps Databricks-injected PG* vars to Label Studio POSTGRE_* vars (and other bootstrap).
+
+resources:
+  apps:
+    label_studio:
+      name: label-studio-${bundle.target}
+      description: "Label Studio (Community) with Lakebase PostgreSQL"
+      source_code_path: ../src/app
+      resources:
+        - name: database
+          postgres:
+            branch: projects/${var.lakebase_project}/branches/${var.lakebase_branch}
+            # Must be the Lakebase *database resource* name (projects/.../databases/db-xxxxx),
+            # not the Postgres db name (e.g. databricks_postgres). List with:
+            #   databricks api get /api/2.0/postgres/projects/<project>/branches/<branch>/databases
+            database: projects/${var.lakebase_project}/branches/${var.lakebase_branch}/databases/${var.lakebase_database_resource_id}
+            permission: CAN_CONNECT_AND_CREATE

@@ -1,0 +1,6 @@
+# Label Studio (pip install per https://labelstud.io/guide/install.html)
+label-studio>=1.13.0,<2
+# Required for PostgreSQL / Lakebase (not pre-installed in Apps runtime)
+psycopg2-binary>=2.9.9
+# WorkspaceClient Config + POST /api/2.0/postgres/credentials (OAuth token as password)
+databricks-sdk>=0.36.0
