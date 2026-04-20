@@ -11,7 +11,9 @@ See: https://docs.databricks.com/aws/en/dev-tools/databricks-apps/environment-va
 
 PostgreSQL 15+ does not allow all roles to CREATE in schema `public`. Lakebase app roles
 typically have CREATE on the database but not on `public`. We create a dedicated schema
-owned by the app role and set `search_path` via PGOPTIONS so Django migrations run there.
+owned by the app role, set `search_path` via PGOPTIONS, and set `DJANGO_SETTINGS_MODULE` to
+`databricks_label_studio_settings` so Django adds the same `search_path` in DATABASE OPTIONS
+for migrate and all ORM connections.
 """
 
 from __future__ import annotations
@@ -100,6 +102,29 @@ def _map_pg_to_label_studio() -> None:
     os.environ["POSTGRE_PORT"] = os.environ.get("PGPORT", "5432")
 
 
+def _prepend_pythonpath(directory: str) -> None:
+    """Ensure label-studio child process can import databricks_label_studio_settings."""
+    sep = os.pathsep
+    raw = os.environ.get("PYTHONPATH", "").strip()
+    parts = [p for p in raw.split(sep) if p] if raw else []
+    if directory not in parts:
+        parts.insert(0, directory)
+    os.environ["PYTHONPATH"] = sep.join(parts)
+
+
+def _ensure_django_uses_lakebase_schema(schema: str) -> None:
+    """
+    Label Studio's server uses os.environ.setdefault(DJANGO_SETTINGS_MODULE, ...).
+    Set our module first so Django (migrate, runserver, ORM) loads DATABASE OPTIONS
+    with search_path for this schema.
+    """
+    app_dir = os.path.dirname(os.path.abspath(__file__))
+    _prepend_pythonpath(app_dir)
+    os.environ["DJANGO_SETTINGS_MODULE"] = "databricks_label_studio_settings"
+    # Same schema as CREATE SCHEMA / PGOPTIONS so Django migrations and ORM stay aligned.
+    os.environ["LABEL_STUDIO_DB_SCHEMA"] = schema
+
+
 def _ensure_dedicated_schema(schema: str) -> None:
     """Create a non-public schema so migrations are allowed (PG15+ public schema restrictions)."""
     if not os.environ.get("PGHOST") or not os.environ.get("PGPASSWORD"):
@@ -124,8 +149,8 @@ def _ensure_dedicated_schema(schema: str) -> None:
             )
     finally:
         conn.close()
-    # libpq / Django pick this up for new connections (search_path avoids `public` CREATE).
-    os.environ["PGOPTIONS"] = f"-c search_path={schema}"
+    # libpq default for new connections; include public so search_path is never empty.
+    os.environ["PGOPTIONS"] = f"-c search_path={schema},public"
 
 
 def main() -> None:
@@ -133,6 +158,7 @@ def main() -> None:
     _ensure_pg_password()
     _map_pg_to_label_studio()
     _ensure_dedicated_schema(_DEFAULT_DB_SCHEMA)
+    _ensure_django_uses_lakebase_schema(_DEFAULT_DB_SCHEMA)
 
     port = os.environ.get("DATABRICKS_APP_PORT", "8000")
     os.environ["LABEL_STUDIO_PORT"] = port

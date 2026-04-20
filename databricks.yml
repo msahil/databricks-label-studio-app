@@ -10,15 +10,15 @@ variables:
   # Resolves ambiguous ~/.databrickscfg entries when multiple profiles share the same host.
   profile:
     default: DEFAULT
-  # Lakebase Autoscaling project id (CLI / API name), e.g. msahi-demo → projects/msahi-demo/branches/...
+  # Lakebase Autoscaling project id (CLI / API name), e.g. msahil-lakebase → projects/msahil-lakebase/branches/...
   # If your project only appears as a UUID in the UI, use: databricks postgres list-projects
   lakebase_project:
-    default: "msahi-demo"
+    default: "msahil-lakebase"
   lakebase_branch:
     default: "production"
   # Resource id from .../databases/{this} (see resources/label_studio.app.yml)
   lakebase_database_resource_id:
-    default: "db-9md1-bq9ljz4hxy"
+    default: "db-fr9a-1xwzpxyy6h"
 
 targets:
   dev:
