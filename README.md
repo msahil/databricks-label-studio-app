@@ -60,15 +60,46 @@ These **must match the Lakebase project** in the workspace you deploy to:
 |----------|---------|
 | **`lakebase_project`** | API **project id** (e.g. `my-project`), **not** necessarily the UUID shown in the Lakebase UI. Use `databricks postgres list-projects`. |
 | **`lakebase_branch`** | Branch id (often `production`). List with `databricks postgres list-branches projects/<lakebase_project>`. |
-| **`lakebase_database_resource_id`** | The **`db-…`** segment from the **database resource name** returned by the API. **Not** the Postgres database name `databricks_postgres`. |
+| **`lakebase_database_resource_id`** | The **`db-…`** segment from the **database resource** for that project and branch. **Not** the Postgres database name `databricks_postgres`. See below for how to look it up and set it in **`databricks.yml`**. |
 
-Discover the database resource id:
+#### How to get `lakebase_database_resource_id` and set it in `databricks.yml`
 
-```bash
-databricks api get "/api/2.0/postgres/projects/<lakebase_project>/branches/<lakebase_branch>/databases" -p <profile>
-```
+1. Set **`lakebase_project`** and **`lakebase_branch`** in **`databricks.yml`** `variables` (or confirm them first). **`lakebase_project`** is the API id from `databricks postgres list-projects --profile <profile>` (for example `msahil-lakebase`, not a UUID unless that is what the API returns). **`lakebase_branch`** is usually `production`.
 
-Use the `name` field like `projects/.../databases/db-xxxxx` and set **`lakebase_database_resource_id`** to `db-xxxxx`.
+2. List databases on that branch (replace placeholders with your project, branch, and CLI profile):
+
+   ```bash
+   databricks api get \
+     "/api/2.0/postgres/projects/<lakebase_project>/branches/<lakebase_branch>/databases" \
+     -p <profile>
+   ```
+
+3. From the JSON response, read **`lakebase_database_resource_id`** from either place (they match):
+
+   - **`databases[].status.database_id`** — e.g. `db-fr9a-1xwzpxyy6h`
+   - The last path segment of **`databases[].name`** — e.g. `projects/msahil-lakebase/branches/production/databases/db-fr9a-1xwzpxyy6h` → use **`db-fr9a-1xwzpxyy6h`**
+
+   If the list is empty, create a database for that branch in the Lakebase UI (or API) first; the app bundle expects an existing database resource.
+
+4. Put that value in **`databricks.yml`** under **`variables`** → **`lakebase_database_resource_id`** → **`default`** (or under **`targets.<name>.variables`** for per-environment overrides):
+
+   ```yaml
+   variables:
+     lakebase_project:
+       default: "msahil-lakebase"
+     lakebase_branch:
+       default: "production"
+     lakebase_database_resource_id:
+       default: "db-fr9a-1xwzpxyy6h"
+   ```
+
+   Optional: extract ids with **`jq`** (if installed), using the first database returned:
+
+   ```bash
+   databricks api get \
+     "/api/2.0/postgres/projects/<lakebase_project>/branches/<lakebase_branch>/databases" \
+     -p <profile> | jq -r '.databases[0].status.database_id'
+   ```
 
 The **`resources/label_studio.app.yml`** file builds the full `postgres.database` path from these variables; you normally **do not** edit that file when moving workspaces—only **`databricks.yml`** variables.
 
@@ -115,7 +146,7 @@ If the error still mentions **`$undefined$`**, the **labeling config** is usuall
 
 ## PostgreSQL 15+ / `public` schema
 
-Lakebase uses Postgres 15-style defaults: new roles may not **CREATE** objects in schema `public`. The app’s `start.py` creates schema `label_studio` (override with env `LABEL_STUDIO_DB_SCHEMA`) and sets `PGOPTIONS` so Django migrations run in that schema. If schema creation fails, ask a project admin to run `GRANT CREATE ON SCHEMA public TO "<app role>";` or create the schema manually.
+Lakebase uses Postgres 15-style defaults: new roles may not **CREATE** objects in schema `public`. The app’s `start.py` creates a dedicated schema (default name `label_studio`, override with env **`LABEL_STUDIO_DB_SCHEMA`**) and sets **`PGOPTIONS`** so connections default to that schema. **`DJANGO_SETTINGS_MODULE`** is set to **`databricks_label_studio_settings`**, which imports Label Studio’s settings and adds **`DATABASES['default']['OPTIONS']['options'] = '-c search_path=…'`** so **`django.db.migrations`** (and all ORM tables) use the same schema. If schema creation fails, ask a project admin to run `GRANT CREATE ON SCHEMA public TO "<app role>";` or create the schema manually.
 
 ## Lakebase auth (Autoscaling)
 
